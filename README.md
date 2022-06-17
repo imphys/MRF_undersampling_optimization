@@ -1,4 +1,4 @@
-# MRF_undersampling_optimization
+# MRF undersampling optimization
 To reproduce the results from the paper *Mitigating undersampling errors in Magnetic Resonance Fingerprinting by sequence optimization* one has to download the following Python files: 
 + main_UEE_phase.py
 + UEE_phase.py
