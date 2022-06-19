@@ -7,12 +7,11 @@ used in UEE_phase.py to calculate the evaluation of the transverse magnetisation
 parameters using the EPG formalism.
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 
-class Cost():
-    def __init__(self, S_init, M0,  N, phi, T1, T2, sigma, print, clip_state, TR_set, Opt_type, weighting,
+class Cost:
+    def __init__(self, S_init, M0, N, phi, T1, T2, sigma, print, clip_state, TR_set, Opt_type, weighting,
                  **kwargs):
         self.S_init = S_init
         self.M0 = M0
@@ -28,7 +27,6 @@ class Cost():
         self.weighting = weighting
         self.kwargs = kwargs
 
-
     def Grad(self, S):
         """
         Perform dephasing step
@@ -36,14 +34,14 @@ class Cost():
         :return: State matrix for next time step
         """
         if S.shape[1] < self.clip_state:
-            S_new = np.zeros((3, S.shape[1]+1), dtype=np.complex)
+            S_new = np.zeros((3, S.shape[1] + 1), dtype=complex)
             S_new[0, 1:] = S[0, :]
             S_new[0, 0] = np.conjugate(S[1, 1])
             S_new[1, :-2] = S[1, 1:]
             S_new[2, :-1] = S[2, :]
 
         else:
-            S_new = np.zeros((3, S.shape[1]), dtype=np.complex)
+            S_new = np.zeros((3, S.shape[1]), dtype=complex)
             S_new[0, 1:] = S[0, :-1]
             S_new[0, 0] = np.conjugate(S[1, 1])
             S_new[1, :-1] = S[1, 1:]
@@ -57,7 +55,7 @@ class Cost():
         :param phi: angle of the rotation axis with the x-axis
         :return: RF matrix
         """
-        R = np.empty((3, 3), dtype=np.complex)
+        R = np.empty((3, 3), dtype=complex)
 
         e_iphi = np.exp(1j * phi)
         a = np.cos(alpha / 2) ** 2
@@ -150,7 +148,7 @@ class Cost():
         :return: Transverse magnetisation signal
         """
         self.TR = self.TR_set
-        signal = np.zeros(self.N, dtype=np.complex)
+        signal = np.zeros(self.N, dtype=complex)
 
         # First step
         R = Cost.RF_matrix(self, alpha[0], self.phi[0])
@@ -159,7 +157,7 @@ class Cost():
 
         for step in range(1, self.N):
             R = Cost.RF_matrix(self, alpha[step], self.phi[step])
-            S_new = Cost.signal_step(self, S=S, tr=self.TR_set[step-1], R=R, step=step)
+            S_new = Cost.signal_step(self, S=S, tr=self.TR_set[step - 1], R=R, step=step)
             signal[step] = S_new[0, 0]
             S = S_new
 
@@ -173,7 +171,7 @@ class Cost():
         """
         try:
             self.TR
-        except:
+        except AttributeError:
             self.TR = self.TR_set
 
         der_m_T1 = np.zeros((2, self.N))
@@ -211,23 +209,27 @@ class Cost():
                     Sz[2, 0] = 1
 
                 # Derivative to T1
-                der_S_T1 = np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step-1], 1), Cost.Grad(self, S)]) + \
-                           -self.M0*self.TR[step-1]/self.T1**2*np.exp(-self.TR[step-1]/self.T1)*np.dot(R, Sz) + \
-                           np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step-1], 0), Cost.Grad(self, der_S_T1_previous)])
+                der_S_T1 = np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step - 1], 1), Cost.Grad(self, S)]) + \
+                           -self.M0 * self.TR[step - 1] / self.T1 ** 2 * np.exp(-self.TR[step - 1] / self.T1) * np.dot(
+                    R, Sz) + \
+                           np.linalg.multi_dot(
+                               [R, Cost.Relax_matrix(self, self.TR[step - 1], 0), Cost.Grad(self, der_S_T1_previous)])
                 der_m_T1[0, step] = np.real(der_S_T1[0, 0])
                 der_m_T1[1, step] = np.imag(der_S_T1[0, 0])
                 der_S_T1_previous = der_S_T1
 
                 # Derivative to T2
-                der_S_T2 = np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step-1], 2), Cost.Grad(self, S)]) + \
-                           np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step-1], 0), Cost.Grad(self, der_S_T2_previous)])
+                der_S_T2 = np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step - 1], 2), Cost.Grad(self, S)]) + \
+                           np.linalg.multi_dot(
+                               [R, Cost.Relax_matrix(self, self.TR[step - 1], 0), Cost.Grad(self, der_S_T2_previous)])
                 der_m_T2[0, step] = np.real(der_S_T2[0, 0])
                 der_m_T2[1, step] = np.imag(der_S_T2[0, 0])
                 der_S_T2_previous = der_S_T2
 
                 # Derivative to M0
-                der_S_M0 = np.linalg.multi_dot([R, Cost.Relax_matrix(self, self.TR[step-1], 0), Cost.Grad(self, der_S_M0_previous)]) + \
-                           (1-np.exp(-self.TR[step-1]/self.T1))*np.dot(R, Sz)
+                der_S_M0 = np.linalg.multi_dot(
+                    [R, Cost.Relax_matrix(self, self.TR[step - 1], 0), Cost.Grad(self, der_S_M0_previous)]) + \
+                           (1 - np.exp(-self.TR[step - 1] / self.T1)) * np.dot(R, Sz)
                 der_m_M0[0, step] = np.real(der_S_M0[0, 0])
                 der_m_M0[1, step] = np.imag(der_S_M0[0, 0])
                 der_S_M0_previous = der_S_M0
@@ -247,25 +249,22 @@ class Cost():
 
         for step in range(self.N):
             J = np.concatenate((der_m_T1[:, step].reshape(2, 1), der_m_T2[:, step].reshape(2, 1),
-                               der_m_M0[:, step].reshape(2, 1)), axis=1)
+                                der_m_M0[:, step].reshape(2, 1)), axis=1)
             J_T = np.transpose(J)
             J_T_J_sum += np.dot(J_T, J)
 
-        I = 1/(self.sigma**2) * J_T_J_sum
+        I = 1 / (self.sigma ** 2) * J_T_J_sum
         V = np.linalg.inv(I)
 
         return V
 
-<<<<<<< HEAD
-    def Opt(self, Opt_param):
+    def Opt(self, Opt_param, return_costs=False):
         """"
         Find cost function value based on the inverse FIM
         :param Opt_param: current acquisition parameters
         :return: Cost function value for CRB optimisation
         """
-=======
-    def Opt(self, Opt_param, return_costs=False):
->>>>>>> origin/master
+
         if self.Opt_type == 'with_TR':
             self.alpha = np.squeeze(Opt_param[:self.N])
             self.TR = np.squeeze(Opt_param[self.N:])
@@ -273,7 +272,7 @@ class Cost():
             self.alpha = np.squeeze(Opt_param)
             self.TR = self.TR_set
         if return_costs:
-            costs = np.zeros((3,3))
+            costs = np.zeros((3, 3))
             costs2 = np.zeros((3))
         Opt_return = 0
         num_weights = len(self.kwargs)
@@ -287,15 +286,15 @@ class Cost():
                 step += 1
             Opt_val = np.trace(np.dot(W, V_val))
         elif self.weighting == 'rCRB':
-            W[0, 0] = 1/self.T1**2
-            W[1, 0] = 1/(self.T1*self.T2)
-            W[2, 0] = 1/(self.T1*self.M0)
-            W[0, 1] = 1/(self.T2*self.T1)
-            W[1, 1] = 1/self.T2**2
-            W[2, 1] = 1/(self.T2*self.M0)
-            W[0, 2] = 1/(self.M0*self.T1)
-            W[1, 2] = 1/(self.M0*self.T2)
-            W[2, 2] = 1/self.M0**2
+            W[0, 0] = 1 / self.T1 ** 2
+            W[1, 0] = 1 / (self.T1 * self.T2)
+            W[2, 0] = 1 / (self.T1 * self.M0)
+            W[0, 1] = 1 / (self.T2 * self.T1)
+            W[1, 1] = 1 / self.T2 ** 2
+            W[2, 1] = 1 / (self.T2 * self.M0)
+            W[0, 2] = 1 / (self.M0 * self.T1)
+            W[1, 2] = 1 / (self.M0 * self.T2)
+            W[2, 2] = 1 / self.M0 ** 2
             Opt_val = np.trace(np.multiply(W, V_val))
         else:
             print('Not a valid weighting')
@@ -308,75 +307,13 @@ class Cost():
             if self.weighting == 'manual':
                 print('np.dot(W, V_val): \n', np.dot(W, V_val))
             elif self.weighting == 'rCRB':
-<<<<<<< HEAD
                 print('np.multiply(W, V_val): \n', np.multiply(W, V_val))
             print('The inverse Fisher-information matrix V is: \n', V_val)
-=======
-                W[0, 0] = 1/self.T1**2
-                W[1, 0] = 1/(self.T1*self.T2)
-                W[2, 0] = 1/(self.T1*self.M0)
-                W[0, 1] = 1/(self.T2*self.T1)
-                W[1, 1] = 1/self.T2**2
-                W[2, 1] = 1/(self.T2*self.M0)
-                W[0, 2] = 1/(self.M0*self.T1)
-                W[1, 2] = 1/(self.M0*self.T2)
-                W[2, 2] = 1/self.M0**2
-                c = np.multiply(W, V_val)
-                if return_costs:
-                    costs+=c
-                    costs2+=np.sqrt(np.diag(c))
-                Opt_val = np.trace(c)
-            else:
-                print('Not a valid weighting')
-                raise InputError('Not a valid weighting')
 
-            Opt_return += Opt_val
-
-            if self.print:
-                """
-                if ii == 0:
-                    global Evolution
-                    Evolution.append(Opt_param)
-                """
-                print('Opt_val is: ', Opt_val)
-                if self.weighting == 'manual':
-                    print('np.dot(W, V_val): \n', np.dot(W, V_val))
-                elif self.weighting == 'rCRB':
-                    print('np.multiply(W, V_val): \n', np.multiply(W, V_val))
-                print('The inverse Fisher-information matrix V is: \n', V_val)
-
-
-        if self.plot:
-            plt.ion()
-            fig = plt.figure(num=1)
-            fig.clear()
-            ax = fig.add_subplot(111)
-            ax.plot(range(self.N), self.alpha, 'r-')  # Returns a tuple of line objects, thus the comma
-
-            plt.xlabel("TR index")
-            plt.ylabel("alpha [rad]")
-            plt.ylim([1/36*np.pi, 1/3*np.pi+1/36*np.pi])
-            fig.canvas.draw()
-            fig.canvas.flush_events()
-
-            plt.ion()
-            fig = plt.figure(num=2)
-            fig.clear()
-            ax = fig.add_subplot(111)
-            ax.plot(range(self.N-1), self.TR, 'r-')  # Returns a tuple of line objects, thus the comma
-
-            plt.xlabel("TR index")
-            plt.ylabel("TR [ms]")
-            plt.ylim([10, 16])
-            fig.canvas.draw()
-            fig.canvas.flush_events()
->>>>>>> origin/master
-
-        # REMOVE ", V_val" WHEN OPTIMISING
         if return_costs:
             return Opt_return, costs, costs2
         else:
-            return (Opt_return) #, V_val
+            return (Opt_return)  # , V_val
 
 
 class JAC():

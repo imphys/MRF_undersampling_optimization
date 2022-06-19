@@ -5,23 +5,17 @@
 Script for sequence optimisation using the predictions from UEE_phase.py
 """
 
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
 import scipy.interpolate as interpolate
 import scipy.optimize as sc_opt
-import nibabel as nib
-import pdb
 from scipy.optimize import Bounds
-from datetime import datetime
-from importlib import reload
-import concurrent.futures
 from tqdm import tqdm
-import UEE_phase as UEE
-import Optimisation
 
-reload(UEE)
-reload(Optimisation)
+import UEE_phase as UEE
 
 
 def jac(Opt_param):
@@ -34,8 +28,9 @@ def jac(Opt_param):
     base = Prob.full_run(Opt_param)
 
     # Determine step size for gradient evaluation
-    res_step = np.finfo(Opt_param.dtype).eps ** (0.5)  # See Numerical Recipes ( W. H. Press et. al). Change for 3-point method
-    step = (res_step) * np.maximum(1, Opt_param)
+    res_step = np.finfo(
+        Opt_param.dtype).eps ** 0.5  # See Numerical Recipes ( W. H. Press et. al). Change for 3-point method
+    step = res_step * np.maximum(1, Opt_param)
 
     Prob_grad = UEE.JAC(Prob=Prob, Opt_param=Opt_param, base=base, step=step)
 
@@ -56,18 +51,18 @@ def jac(Opt_param):
 
     return Jac
 
+
 if __name__ == '__main__':
     startTime = datetime.now()
     # %% Optimisation settings
     # Tolerance for convergence
     ftol = 1e-2
     # Lower bound on flip angle sequence
-    alpha_min = 1/18 * np.pi
+    alpha_min = 1 / 18 * np.pi
     # Upper bound on flip angle sequence
-    alpha_max = 1/3 * np.pi
+    alpha_max = 1 / 3 * np.pi
     # Upper bound on absolute difference between two consecutive flip angles
-    alpha_max_step = 1/180 * np.pi
-
+    alpha_max_step = 1 / 180 * np.pi
 
     # %% Practical settings
     # Boolean for saving the figures in the current directory
@@ -113,8 +108,8 @@ if __name__ == '__main__':
 
     # %% acquisition settings (2) (Changing NOT recommended)
     clip_state = N / 2
-    Opt_type = 'without_TR'     # Either 'with_TR' or 'without_TR'
-    weighting = 'rCRB'          # Either 'manual' or 'rCRB'
+    Opt_type = 'without_TR'  # Either 'with_TR' or 'without_TR'
+    weighting = 'rCRB'  # Either 'manual' or 'rCRB'
     W_T1 = 0
     W_T2 = 0
     W_M0 = 0
@@ -169,21 +164,21 @@ if __name__ == '__main__':
     shape_extended = (int(shape[0] + 2 * np.floor(shape[0] / 2)),
                       int(shape[1] + 2 * np.floor(shape[1] / 2)))
 
-# ----------------------------------------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------------------------------
     # DO NOT CHANGE PARAMETERS BELOW HERE
 
     # %% Define model parameters
-    theta_1 = np.array([T1 - theta_0[0], T2 - theta_0[1], M0_field/rho_0_scale - 1 , np.zeros(shape)])
+    theta_1 = np.array([T1 - theta_0[0], T2 - theta_0[1], M0_field / rho_0_scale - 1, np.zeros(shape)])
     # Initialise state matrix
     S = np.zeros((3, 2), dtype=np.complex)
     M0 = np.complex(theta_0[2], theta_0[3])
     S[2, 0] = M0
     # Define flip angle initialisations
     if init == 'init_1':
-        alpha = 1/3*np.pi * np.abs(np.sin(np.array(range(N))*(1.5*2*np.pi/N)))
+        alpha = 1 / 3 * np.pi * np.abs(np.sin(np.array(range(N)) * (1.5 * 2 * np.pi / N)))
     elif init == 'init_2':
-        alpha = (1/18 + 1/2*(1/3 - 1/18))*np.pi + (
-                    1/3*(1/3 - 1/18)*np.pi * np.abs(np.sin(np.array(range(N))*(4*2*np.pi/N))))
+        alpha = (1 / 18 + 1 / 2 * (1 / 3 - 1 / 18)) * np.pi + (
+                1 / 3 * (1 / 3 - 1 / 18) * np.pi * np.abs(np.sin(np.array(range(N)) * (4 * 2 * np.pi / N))))
     alpha[0] = np.pi
 
     # Plot flip angle initialisation
@@ -225,8 +220,7 @@ if __name__ == '__main__':
                     clip_state=clip_state, Opt_type=Opt_type, weighting=weighting, W_T1=W_T1, W_T2=W_T2, W_M0=W_M0,
                     G_j=G_j, P_j=P_j, P_j_tot=P_j_tot, P_j_resid=P_j_resid, rho_0_star=rho_0_star, method=method)
 
-
-    #%% Set Optimisation parameters
+    # %% Set Optimisation parameters
     Opt_param = np.zeros((1, N))
     Opt_param[0, :] = alpha
     Opt_param = np.squeeze(Opt_param)
@@ -251,16 +245,15 @@ if __name__ == '__main__':
     ineq_cons = [{"type": "ineq", "fun": lambda x: -mat @ x + ub},
                  {"type": "ineq", "fun": lambda x: mat @ x - lb}]
 
-
-
-    #%% Optimisation
+    # %% Optimisation
     print('Start optimisation')
-    res = sc_opt.minimize(fun=Prob.full_run,  x0=Opt_param, method='SLSQP', options={'ftol': ftol, 'iprint': 2, 'disp': True, 'maxiter': 800},
-                          bounds=bounds,  jac=jac, constraints=ineq_cons)
+    res = sc_opt.minimize(fun=Prob.full_run, x0=Opt_param, method='SLSQP',
+                          options={'ftol': ftol, 'iprint': 2, 'disp': True, 'maxiter': 800},
+                          bounds=bounds, jac=jac, constraints=ineq_cons)
 
-    #%% Results
+    # %% Results
     Opt_alpha = res.x
-    np.save(save_index+'_Opt_alpha', Opt_alpha)
+    np.save(save_index + '_Opt_alpha', Opt_alpha)
 
     plt.figure()
     plt.plot(range(N), alpha, label='Initial alpha')
@@ -269,7 +262,7 @@ if __name__ == '__main__':
     plt.ylabel("alpha [rad]")
     plt.legend()
     plt.title('Alpha optimised')
-    plt.ylim([alpha_min-0.02*np.pi, alpha_max+0.02*np.pi])
+    plt.ylim([alpha_min - 0.02 * np.pi, alpha_max + 0.02 * np.pi])
     plt.savefig(save_index + '_Alpha optimised N = ' + str(N))
 
     np.savez(save_index + '_Settings', PSF_err=PSF_err, dcf_bool=dcf_bool,
@@ -277,7 +270,3 @@ if __name__ == '__main__':
              spiral=spiral, plot_index=plot_index, alpha=alpha,
              ftol=ftol, T1=T1, T2=T2, M0_field=M0_field, phase=phase, interleaf=interleaf)
     print('Runtime: ', datetime.now() - startTime)
-
-
-
-

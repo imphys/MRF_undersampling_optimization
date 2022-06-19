@@ -10,32 +10,25 @@ MR Fingerprinting reconstructions", by C.C. Stolk and A. Sbrizzi.
 External input: k-space sampling pattern and (optionally) scan for ground truth.
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from matplotlib.colors import SymLogNorm
-import matplotlib.ticker as mtick
-import sigpy.mri as spmri
-import sigpy as sp
-import scipy as sc
-import nibabel as nib
-import pdb
-import h5py
-from importlib import reload
 from datetime import datetime
-import Optimisation
-import Bloch_simulation_DH
 
-reload(Optimisation)
-reload(Bloch_simulation_DH)
-plt.close('all')
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import numpy as np
+import scipy as sc
+import sigpy as sp
+import sigpy.mri as spmri
+from matplotlib.colors import SymLogNorm
+from tqdm import tqdm
+
+import Optimisation
 
 # %% Acquisition settings (1)
-if __name__=='__main__':
+if __name__ == '__main__':
     # Numerical value for the amount of time indices
     N = 400
     # Construction of the conventional sequence with 3 arches
-    alpha_conv = 1/3*np.pi * np.abs(np.sin(np.array(range(N)) * (1.5*2*np.pi/N)))
+    alpha_conv = 1 / 3 * np.pi * np.abs(np.sin(np.array(range(N)) * (1.5 * 2 * np.pi / N)))
     alpha_conv[0] = np.pi
     # Sequences for which the undersampling error is predicted. The suffix "x_32" with x={1,2,3} determines the
     # undersampling rate
@@ -48,7 +41,7 @@ if __name__=='__main__':
 
     for ii in range(len(dict)):
         startTime = datetime.now()
-        #%% Practical settings
+        # %% Practical settings
         # Boolean for saving the figures in the current directory
         savefig = True
         # Boolean for saving the data in the current directory
@@ -66,8 +59,7 @@ if __name__=='__main__':
         # Numerical value that determines which parameter map is plotted (0 for T1, 1 for T2)
         plot_index = 1
 
-
-        #%% k-space sampling settings
+        # %% k-space sampling settings
         # Boolean for including the 'PSF error' term
         PSF_err = True
         # Boolean for golden angle rotation of the k-space sampling pattern. If False a 2*pi/32 incremental rotation is
@@ -78,12 +70,12 @@ if __name__=='__main__':
         # Numerical value for the offset angle for the first k-space sampling pattern
         off_set = 0
 
-# ----------------------------------------------------------------------------------------------------------------------
-    # DO NOT CHANGE PARAMETERS BELOW HERE
-        #%% Acquisition settings (2) (Changing NOT recommended)
+        # ----------------------------------------------------------------------------------------------------------------------
+        # DO NOT CHANGE PARAMETERS BELOW HERE
+        # %% Acquisition settings (2) (Changing NOT recommended)
         clip_state = N / 2
-        Opt_type = 'without_TR'     # Either 'with_TR' or 'without_TR'
-        weighting = 'rCRB'          # Either 'manual' or 'rCRB'
+        Opt_type = 'without_TR'  # Either 'with_TR' or 'without_TR'
+        weighting = 'rCRB'  # Either 'manual' or 'rCRB'
         W_T1 = 0
         W_T2 = 0
         W_M0 = 0
@@ -149,6 +141,7 @@ class Cost():
         self.method = method
 
     # %% Functions independent of acquisition parameters (run without using __init__ values)
+    @staticmethod
     def Zero_padding(image, shape):
         """
         This function is applied when the image has even dimensions and returns an image with uneven dimension by zero
@@ -166,6 +159,7 @@ class Cost():
 
         return image_new
 
+    @staticmethod
     def Log_scaling(field, indicator):
         """
         Applies logarithmic operation or inverse operation on field
@@ -182,6 +176,7 @@ class Cost():
 
         return field_return
 
+    @staticmethod
     def Create_mask(width, rad_frac):
         """
         Create circular boolean mask for checkerboard pattern.
@@ -202,6 +197,7 @@ class Cost():
 
         return mask
 
+    @staticmethod
     def phase_field(shape, order):
         """
         Create phase field for numerical experiment with checkerboard phantom (figure 3)
@@ -209,14 +205,15 @@ class Cost():
         :param order: determines the amount of variation in the phase pattern
         :return: NxN complex phase array with image dimensions
         """
-        border = (int(np.floor(shape[0]/2)), int(np.floor(shape[1]/2)))
+        border = (int(np.floor(shape[0] / 2)), int(np.floor(shape[1] / 2)))
         A, B = np.mgrid[-border[0]:border[0] + 1, -border[1]:border[1] + 1]
-        dist = A**2 + B**2
-        dist_rescale = (dist*order / dist[border[0], 0]) * 2*np.pi
+        dist = A ** 2 + B ** 2
+        dist_rescale = (dist * order / dist[border[0], 0]) * 2 * np.pi
         phase = np.exp(dist_rescale * 1j)
 
         return phase
 
+    @staticmethod
     def Spiral_coord(index, bounds, shape, golden_angle, spiral, off_set, interleaf, **kwargs):
         """
         Create k-space sampling coordinates.
@@ -231,59 +228,15 @@ class Cost():
         :return: kx2 array (k is the amount of sampled k-space points in one spiral)
         """
         if spiral == 'Philips_spiral':
-            # %% Define Philips spiral
-<<<<<<< HEAD
-            # f = h5py.File('20210812_185622_David_conv_2sl_1_32_bni.h5', 'r')
-            # coord = np.array(f[list(f.keys())[0]])
-            # coord = np.transpose(coord[:2, :])
+
             coord = np.load('Single spiral.npz')
             coord = coord['Coords']
             coord = np.transpose(coord)
-=======
-            f = h5py.File('Brain_map/Philips_spiral/20210412_182435_spiral_mrf_1sl_full_bni.h5', 'r')
-            coord = np.array(f[list(f.keys())[0]])
-            coord = np.transpose(coord[:2, :])
-            len_one_spiral = coord.shape[0]
-            # Scale coordinages (1.45 if edges should be sampled)
-            if bounds == '2-pi':
-                coord = coord * (1.00 * np.pi / 0.5)
-            elif bounds == 'full':
-                coord = coord * (1.00 * shape[0] / (2 * 0.5))
-        elif spiral == 'Philips_spiral_2':
-            # %% Define Philips spiral
-            f = h5py.File('U:/mrflumc/Results_David/MRF_Optimisation/Brain_map/Philips_spiral/20210614_191207_Emiel_1sl_1_32_bni.h5', 'r')
-            coord = np.array(f[list(f.keys())[0]])
-            coord = np.transpose(coord[:2, :])
-            len_one_spiral = coord.shape[0]
-            # coord[:, 1] = -coord[:, 1]
-            """
-            if kwargs['Bool']:
-                coord_new = np.copy(coord)
-                plt.figure(1)
-                plt.plot(coord_new[:, 0], coord_new[:, 1], label='old')
-                print('Changes processed')
-                coord_new[:, 1] = -coord_new[:, 1]
-                plt.figure(1)
-                plt.plot(coord_new[:, 0], coord_new[:, 1], label='new')
-                plt.legend()
-                plt.savefig('Spiral sampling')
-            """
 
-            # Scale coordinages (1.45 if edges should be sampled)
-            if bounds == '2-pi':
-                coord = coord * (1.00 * np.pi / 0.5)
-            elif bounds == 'full':
-                coord = coord * (1.00 * shape[0] / (2 * 0.5))
-        elif spiral == 'Philips_spiral_3':
-            # %% Define Philips spiral
-            f = h5py.File('U:/mrflumc/Results_David/MRF_Optimisation/Brain_map/Philips_spiral/20210812_185622_David_conv_2sl_1_32_bni.h5', 'r')
-            coord = np.array(f[list(f.keys())[0]])
-            coord = np.transpose(coord[:2, :])
->>>>>>> origin/master
             len_one_spiral = coord.shape[0]
             # Scale coordinages (1.45 if edges should be sampled)
             if bounds == '2-pi':
-                coord = coord * (1.00* np.pi / 0.5)
+                coord = coord * (1.00 * np.pi / 0.5)
             elif bounds == 'full':
                 coord = coord * (1.00 * shape[0] / (2 * 0.5))
         elif spiral == 'var_density':
@@ -303,7 +256,8 @@ class Cost():
             realcoord = []
             imgcoord = []
             for ii in range(interleaf):
-                comp_coord = (coord[:, 0] + 1j * coord[:, 1]) * np.exp((1j*gold_ang * (index*interleaf + ii)) + 1j*off_set)
+                comp_coord = (coord[:, 0] + 1j * coord[:, 1]) * np.exp(
+                    (1j * gold_ang * (index * interleaf + ii)) + 1j * off_set)
                 realcoord = np.append(realcoord, np.real(comp_coord))
                 imgcoord = np.append(imgcoord, np.imag(comp_coord))
             output = np.stack((realcoord, imgcoord), axis=1)
@@ -314,7 +268,8 @@ class Cost():
             realcoord = []
             imgcoord = []
             for ii in range(interleaf):
-                comp_coord = (coord[:, 0] + 1j*coord[:, 1]) * np.exp((1j*angle * (index + fac//interleaf*ii)) + 1j*off_set)
+                comp_coord = (coord[:, 0] + 1j * coord[:, 1]) * np.exp(
+                    (1j * angle * (index + fac // interleaf * ii)) + 1j * off_set)
                 realcoord = np.append(realcoord, np.real(comp_coord))
                 imgcoord = np.append(imgcoord, np.imag(comp_coord))
             output = np.stack((realcoord, imgcoord), axis=1)
@@ -330,6 +285,7 @@ class Cost():
 
         return output, bool_mask, len_one_spiral
 
+    @staticmethod
     def Spiral_dcf(spiral_coord, dcf_bool):
         """
         Function to generate density compensation weights.
@@ -347,6 +303,7 @@ class Cost():
 
         return dcf
 
+    @staticmethod
     def Coord(shape):
         """
         Helper function for image coordinates. Coord[0, :, :] are the x-coordinates and Coord[1, :, :] are the y coordinates
@@ -364,6 +321,7 @@ class Cost():
 
         return coord_mat
 
+    @staticmethod
     def P_single(G_j, shape, spiral, spiral_dcf):
         """
         Calculate single point spread function. Inefficient (redundant) implementation of P_single_fft.
@@ -375,7 +333,7 @@ class Cost():
         """
         m1 = shape[0]
         m2 = shape[1]
-        P_j = np.zeros((G_j[0, :, :].shape[0], G_j[0, :, :].shape[1]), dtype=np.complex)
+        P_j = np.zeros((G_j[0, :, :].shape[0], G_j[0, :, :].shape[1]), dtype=complex)
         for ii in tqdm(range(G_j[0, :, :].shape[0]), desc='Wave summation for PSF'):
             for iii in range(G_j[0, :, :].shape[1]):
                 P_j[ii, iii] = 1 / (m1 * m2) * np.sum(
@@ -383,6 +341,7 @@ class Cost():
 
         return P_j
 
+    @staticmethod
     def P_single_fft(shape_extended, spiral, spiral_dcf):
         """
         Calculate single point spread function in an efficient FFT manner
@@ -395,6 +354,7 @@ class Cost():
         P_j = nufftlinop.H * (spiral_dcf)
         return P_j
 
+    @staticmethod
     def P_all(G_j, N, shape, shape_extended, under_sampling, golden_angle, spiral, off_set, interleaf, method, dcf_bool,
               save_index, savefig, printing):
         """
@@ -418,15 +378,16 @@ class Cost():
         :return: P_j is (n + 2*np.floor(n/2))x(n + 2*np.floor(n/2))xN array and P_j_tot is
         (n + 2*np.floor(n/2))x(n + 2*np.floor(n/2)) array
         """
-        P_j = np.zeros([N, shape_extended[0], shape_extended[1]], dtype=np.complex)
-        P_j_tot = np.zeros([shape_extended[0], shape_extended[1]], dtype=np.complex)
+        P_j = np.zeros([N, shape_extended[0], shape_extended[1]], dtype=complex)
+        P_j_tot = np.zeros([shape_extended[0], shape_extended[1]], dtype=complex)
 
         if under_sampling == True:
             for ii in tqdm(range(N), desc='Making the PSF'):
                 if method == "Explicit":
                     spiral_coord, bool_mask, len_one_spiral = Cost.Spiral_coord(ii, bounds='2-pi', shape=shape,
-                                                                golden_angle=golden_angle,
-                                                                spiral=spiral, off_set=off_set, interleaf=interleaf)
+                                                                                golden_angle=golden_angle,
+                                                                                spiral=spiral, off_set=off_set,
+                                                                                interleaf=interleaf)
                     dcf = Cost.Spiral_dcf(spiral_coord[:len_one_spiral, :], dcf_bool)
                     spiral_coord = spiral_coord[bool_mask]
                     dcf = np.tile(dcf, (interleaf, 1))
@@ -434,8 +395,9 @@ class Cost():
                     P_j[ii, :, :] = Cost.P_single(G_j, shape, spiral_coord, dcf)
                 elif method == "FFT":
                     spiral_coord, bool_mask, len_one_spiral = Cost.Spiral_coord(ii, bounds='full', shape=shape_extended,
-                                                                golden_angle=golden_angle,
-                                                                spiral=spiral, off_set=off_set, interleaf=interleaf)
+                                                                                golden_angle=golden_angle,
+                                                                                spiral=spiral, off_set=off_set,
+                                                                                interleaf=interleaf)
                     dcf = Cost.Spiral_dcf(spiral_coord[:len_one_spiral, :], dcf_bool)
                     spiral_coord = spiral_coord[bool_mask]
                     dcf = np.tile(dcf, (interleaf, 1))
@@ -468,17 +430,6 @@ class Cost():
             if printing:
                 print('The scale factor is: ', scale)
                 print('Sum of P_j_tot after scaling is: ', np.sum(P_j_tot))
-
-<<<<<<< HEAD
-=======
-                plt.figure()
-                plt.title('$P_{tot}$')
-                plt.imshow(np.abs(P_j_tot))
-                if savefig:
-                    plt.savefig(save_index + '_P_tot')
-
->>>>>>> origin/master
-
         elif under_sampling == False:
             spiral_coord_help = Cost.Coord(shape)
             spiral_coord = np.zeros((shape[0] * shape[1], 2))
@@ -525,10 +476,10 @@ class Cost():
         M = Prob.signal(alpha=Opt_param)
         der_m_T1_raw, der_m_T2_raw, der_m_M0 = Prob.dm_dT(alpha=Opt_param)
 
-        der_m_T1 = (der_m_T1_raw[0, :] + 1j*der_m_T1_raw[1, :]) * np.exp(self.theta_0[0])
-        der_m_T2 = (der_m_T2_raw[0, :] + 1j*der_m_T2_raw[1, :]) * np.exp(self.theta_0[1])
-        der_m_M0 = der_m_M0[0, :] + 1j*der_m_M0[1, :]
-        Mat = np.array([der_m_T1, der_m_T2, der_m_M0, der_m_M0*1j])
+        der_m_T1 = (der_m_T1_raw[0, :] + 1j * der_m_T1_raw[1, :]) * np.exp(self.theta_0[0])
+        der_m_T2 = (der_m_T2_raw[0, :] + 1j * der_m_T2_raw[1, :]) * np.exp(self.theta_0[1])
+        der_m_M0 = der_m_M0[0, :] + 1j * der_m_M0[1, :]
+        Mat = np.array([der_m_T1, der_m_T2, der_m_M0, der_m_M0 * 1j])
 
         return M, Mat
 
@@ -545,9 +496,11 @@ class Cost():
         N = np.dot(np.conjugate(Mat), Mat.transpose())
 
         for ii in range(4):
-            S_1_0_resid[ii, :, :] = np.sum(self.P_j_resid * np.conjugate(Mat[ii, :][:, None, None]) * M[:, None, None], axis=0)
+            S_1_0_resid[ii, :, :] = np.sum(self.P_j_resid * np.conjugate(Mat[ii, :][:, None, None]) * M[:, None, None],
+                                           axis=0)
             for iii in range(4):
-                S_1_1_resid[ii, iii, :, :] = np.sum(self.P_j_resid * np.conjugate(Mat[ii, :][:, None, None]) * Mat[iii, :][:, None, None], axis=0)
+                S_1_1_resid[ii, iii, :, :] = np.sum(
+                    self.P_j_resid * np.conjugate(Mat[ii, :][:, None, None]) * Mat[iii, :][:, None, None], axis=0)
 
         return N, S_1_0_resid, S_1_1_resid
 
@@ -560,11 +513,13 @@ class Cost():
         """
         E_1 = np.zeros([4, self.shape[0], self.shape[1]])
         E_2 = np.zeros([4, self.shape[0], self.shape[1]])
-        sum_term = np.zeros([4, self.shape[0], self.shape[1]], dtype=np.complex)
+        sum_term = np.zeros([4, self.shape[0], self.shape[1]], dtype=complex)
         for ii in range(4):
-            E_1[ii, :, :] = np.real(np.conjugate(self.rho_0_star) * sc.signal.convolve(self.rho, S_1_0_resid[ii, :, :], mode='same'))
+            E_1[ii, :, :] = np.real(
+                np.conjugate(self.rho_0_star) * sc.signal.convolve(self.rho, S_1_0_resid[ii, :, :], mode='same'))
             for iii in range(4):
-                sum_term[iii, :, :] = sc.signal.convolve(self.rho * self.theta_1[iii, :, :], S_1_1_resid[ii, iii, :, :], mode='same')
+                sum_term[iii, :, :] = sc.signal.convolve(self.rho * self.theta_1[iii, :, :], S_1_1_resid[ii, iii, :, :],
+                                                         mode='same')
             E_2[ii, :, :] = np.real(np.sum(np.conjugate(self.rho_0_star) * sum_term, axis=0))
 
         return E_1, E_2
@@ -579,12 +534,12 @@ class Cost():
         """
         Error_term_1 = np.zeros([4, self.shape[0], self.shape[1]])
         Error_term_2 = np.zeros([4, self.shape[0], self.shape[1]])
-        P_theta_1 = np.zeros([4, self.shape[0], self.shape[1]], dtype=np.complex)
+        P_theta_1 = np.zeros([4, self.shape[0], self.shape[1]], dtype=complex)
 
         for ii in range(4):
             P_theta_1[ii, :, :] = sc.signal.convolve(self.rho * self.theta_1[ii, :, :], self.P_j_tot, mode='same')
 
-        NP_theta_1 = np.zeros([4, self.shape[0], self.shape[1]], dtype=np.complex)
+        NP_theta_1 = np.zeros([4, self.shape[0], self.shape[1]], dtype=complex)
         Ninv_rho_NP_theta_1 = np.zeros([4, self.shape[0], self.shape[1]])
 
         N_inv = np.linalg.inv(np.real(N))
@@ -597,32 +552,14 @@ class Cost():
             Ninv_rho_NP_theta_1[:, iii, :] = np.dot(N_inv, rho_NP_theta_1[:, iii, :])
 
         if self.PSF_err:
-            theta_1_star = 1/(np.abs(self.rho_0_star)**2) * (Ninv_rho_NP_theta_1 + Error_term_1 + Error_term_2)
+            theta_1_star = 1 / (np.abs(self.rho_0_star) ** 2) * (Ninv_rho_NP_theta_1 + Error_term_1 + Error_term_2)
         else:
-            theta_1_star = self.theta_1 + 1/(np.abs(self.rho_0_star)**2) * (Error_term_1 + Error_term_2)
+            theta_1_star = self.theta_1 + 1 / (np.abs(self.rho_0_star) ** 2) * (Error_term_1 + Error_term_2)
 
         return theta_1_star, Ninv_rho_NP_theta_1, Error_term_1, Error_term_2
 
-<<<<<<< HEAD
     def full_run(self, Opt_param):
-=======
-    def full_run(self, Opt_param, return_RMS=False):
-        # %% Matrix for projection to lower dimensional space
-        if self.SVD:
-            dict = Bloch_simulation_DH.full_run(Opt_param)
-            dict = dict[()]
-            dict_matrix = np.array([dict[i] for i in dict.keys()])
-            signal_norm = np.linalg.norm(dict_matrix, 2, axis=1)
-            dict_matrix_norm = dict_matrix / signal_norm[:, None]
 
-            U, S, VH = np.linalg.svd(dict_matrix_norm)
-            E = np.sum(S ** 2)
-            E_ratio = 1 / E * np.sum(S[:self.Lrank] ** 2)
-            if self.printing:
-                print('A fraction of: ', E_ratio, ' is captured using this low rank approximation')
-            V_LR = VH[:self.Lrank, :].conj().T
-
->>>>>>> origin/master
         # %% Calculate evolution data
         M, Mat = Cost.Evaluation_data(self, Opt_param)
         if np.sum(np.real(M) ** 2) != 0:
@@ -641,7 +578,7 @@ class Cost():
         tissue_map = np.zeros([2, self.shape[0], self.shape[1]])
         for ii in range(2):
             tissue_map[ii, :, :] = Cost.Log_scaling(self.mask * (self.theta_0[ii] + theta_1_star[ii, :, :]), 1)
-        rho_1 = theta_1_star[2, :, :] + theta_1_star[3, :, :]*1j
+        rho_1 = theta_1_star[2, :, :] + theta_1_star[3, :, :] * 1j
         rho_star = self.rho_0_star * (1 + rho_1)
 
         Ninv_rho_NP_theta_1 = Cost.Log_scaling(self.mask * 1 / (np.abs(self.rho_0_star) ** 2) * Ninv_rho_NP_theta_1, 1)
@@ -670,9 +607,9 @@ class Cost():
             frac_error[ii, :, :] = self.mask * (tissue_map[ii, :, :] - tissue[ii, :, :]) / tissue_div[ii, :, :]
 
             squared_sum_rel_err = np.sum((frac_error[ii, :, :]) ** 2)
-            RMS_rel_bias[ii] = np.sqrt(1/T * squared_sum_rel_err)
+            RMS_rel_bias[ii] = np.sqrt(1 / T * squared_sum_rel_err)
 
-        result = 100 * (np.sum(RMS_rel_bias))/2
+        result = 100 * (np.sum(RMS_rel_bias)) / 2
 
         if self.printing:
             print('RMS relative error of the bias T1: ', RMS_rel_bias[0])
@@ -682,18 +619,9 @@ class Cost():
                      Error_term_1=Error_term_1, Error_term_2=Error_term_2, N=N, theta_1_star=theta_1_star,
                      rho_0_star=rho_0_star, Ninv_rho_NP_theta_1=Ninv_rho_NP_theta_1, RMS_rel_bias=RMS_rel_bias)
         if self.plot:
-<<<<<<< HEAD
             Cost.Plot(self, tissue_map, rho_star, RMS_rel_bias, frac_error)
 
         return result
-=======
-            Cost.Plot(self, Ninv_rho_NP_theta_1, Error_term_1, Error_term_2, tissue, tissue_map, rho_star, RMS_rel_bias, error,
-                      frac_error)
-        if return_RMS:
-            return result, RMS_rel_bias, frac_error
-        else:
-            return result
->>>>>>> origin/master
 
     def Plot(self, tissue_map, rho_star, RMS_rel_bias, frac_error):
         fig = plt.figure()
@@ -746,10 +674,12 @@ class Cost():
         if self.savefig:
             plt.savefig(self.save_index + '_mag_rho')
 
+
 class JAC():
     """
     This class is used in 'main_UEE_phase.py' to calculate the Jacobian.
     """
+
     def __init__(self, Prob, Opt_param, base, step):
         self.Prob = Prob
         self.Opt_param = Opt_param
@@ -765,7 +695,7 @@ class JAC():
         return Jac_step
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     # %% Define tissue parameters (Checkerboard)
     if tissue_param == 'Checkerboard':
         base = (11, 11)  # Checkerboard pattern (15)
@@ -803,7 +733,7 @@ if __name__=='__main__':
         M0_field = Cost.Zero_padding(Data['M0'], shape)
         mask = M0_field > 0.01
         N_vox = np.sum(mask)
-        rho_0_scale = 1/N_vox * np.sum(mask * M0_field)
+        rho_0_scale = 1 / N_vox * np.sum(mask * M0_field)
 
         T1 = mask * Cost.Zero_padding(np.nan_to_num(Data['T1']), shape)
         T2 = mask * Cost.Zero_padding(np.nan_to_num(Data['T2']), shape)
@@ -830,10 +760,10 @@ if __name__=='__main__':
     if tissue_param == 'Checkerboard':
         theta_1 = np.array([T1 - theta_0[0], T2 - theta_0[1], np.zeros(shape), np.zeros(shape)])
     elif tissue_param == 'Scan':
-        theta_1 = np.array([T1 - theta_0[0], T2 - theta_0[1], M0_field/rho_0_scale - 1 , np.zeros(shape)])
+        theta_1 = np.array([T1 - theta_0[0], T2 - theta_0[1], M0_field / rho_0_scale - 1, np.zeros(shape)])
 
     # Initialise state matrix
-    S = np.zeros((3, 2), dtype=np.complex)
+    S = np.zeros((3, 2), dtype=complex)
     M0 = 1
     S[2, 0] = M0
     alpha = dict[ii]['alpha']
@@ -869,5 +799,3 @@ if __name__=='__main__':
     Opt_param = alpha
     Result = Prob.full_run(Opt_param)
     print('Opt val is: ', Result)
-
-
