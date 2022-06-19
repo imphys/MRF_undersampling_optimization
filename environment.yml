@@ -1,4 +1,4 @@
-name: Python
+name: Python_opt
 channels:
   - conda-forge
   - defaults
@@ -153,7 +153,5 @@ dependencies:
     - scipy==1.5.2
     - shapely==1.7.1
     - sigpy==0.1.21
-    - sycomore==1.2.1
     - tqdm==4.50.0
-prefix: C:\Users\david\Anaconda3\envs\Python
 
