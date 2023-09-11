@@ -324,7 +324,7 @@ class JAC():
         self.step = step
 
     def jac_step(self, ii):
-        Opt_one_step_forward = self.Opt_param
+        Opt_one_step_forward = np.copy(self.Opt_param)
         Opt_one_step_forward[ii] = self.Opt_param[ii] + self.step[ii]
         one_step_forward = self.Prob.Opt(Opt_one_step_forward)
 
